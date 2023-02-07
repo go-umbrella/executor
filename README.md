@@ -1,4 +1,8 @@
-# `executor`: elegant concurrency for golang 
+<div align="center">
+
+# 🚀 `executor`: elegant concurrency for golang 🚀
+
+</div>
 
 ---
 
