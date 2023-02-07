@@ -2,12 +2,6 @@
 
 # 🚀 `executor`: elegant concurrency for golang 🚀
 
-</div>
-
----
-
-<div align="center">
-
 ![Build status](https://github.com/go-umbrella/executor/actions/workflows/build.yml/badge.svg)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/go-umbrella/executor)
 <a title="Release" target="_blank" href="https://github.com/go-umbrella/executor/releases"><img src="https://img.shields.io/github/v/release/go-umbrella/executor"></a>
@@ -32,7 +26,7 @@
 
 `executor` is your toolkit for simple, reliable and elegant concurrency in go.
 
-## Installation
+## 🛠 Installation
 
 To install `executor`, run:
 
@@ -40,4 +34,4 @@ To install `executor`, run:
 go get -u github.com/go-umbrella/executor
 ```
 
-## Examples
+## 📚 Examples
