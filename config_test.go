@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"runtime"
 	"testing"
@@ -14,7 +13,7 @@ func TestConfig_Normalize(t *testing.T) {
 		expected Config
 	}{
 		{
-			name:   "should_normalize_name_and_concurrency",
+			name:   "should_normalize_concurrency",
 			config: Config{},
 			expected: Config{
 				Concurrency:         uint64(runtime.NumCPU()),
@@ -25,13 +24,11 @@ func TestConfig_Normalize(t *testing.T) {
 		{
 			name: "should_keep_valid_configurations",
 			config: Config{
-				Name:                "my-beautiful-executor",
 				Concurrency:         uint64(runtime.NumCPU() * 4),
 				QueueSize:           16,
 				EagerInitialization: true,
 			},
 			expected: Config{
-				Name:                "my-beautiful-executor",
 				Concurrency:         uint64(runtime.NumCPU() * 4),
 				QueueSize:           16,
 				EagerInitialization: true,
@@ -41,10 +38,6 @@ func TestConfig_Normalize(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if testCase.expected.Name == "" {
-				testCase.expected.Name = fmt.Sprintf("%p", &testCase.config)
-			}
-
 			testCase.config.normalize()
 			assert.Equal(t, testCase.expected, testCase.config)
 		})
