@@ -3,9 +3,11 @@ package executor
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"math"
 	"runtime"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestNew(t *testing.T) {
@@ -80,6 +82,61 @@ func TestNew(t *testing.T) {
 			assert.Equal(t, testCase.expected.workerCount, atomic.LoadUint64(&executor.workerCount))
 			assert.Equal(t, testCase.expected.workerRunningCount, atomic.LoadUint64(&executor.workerRunningCount))
 		})
+	}
+}
+
+func TestExecutor_WorkerLifeCycle(t *testing.T) {
+	concurrency := uint64(4)
+	executor := New("test", Config{
+		Concurrency:         concurrency,
+		QueueSize:           4,
+		EagerInitialization: true,
+	}).(*executor)
+
+	assert.Equal(t, concurrency, atomic.LoadUint64(&executor.workerCount))
+	assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
+
+	taskCounter := uint64(0)
+	rounds := 8
+	task := func() {
+		time.Sleep(100 * time.Millisecond)
+		atomic.AddUint64(&taskCounter, 1)
+	}
+
+	for i := 0; i < rounds; i++ {
+		executor.taskQueue <- task
+		time.Sleep(10 * time.Millisecond)
+		assert.Equal(t, concurrency, atomic.LoadUint64(&executor.workerCount))
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerRunningCount))
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, uint64(rounds), taskCounter)
+	assert.Equal(t, concurrency, atomic.LoadUint64(&executor.workerCount))
+	assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
+
+	for i := uint64(0); i < concurrency; i++ {
+		executor.workerStopSignal <- struct{}{}
+		time.Sleep(10 * time.Millisecond)
+		assert.Equal(t, concurrency-(i+1), atomic.LoadUint64(&executor.workerCount))
+		assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
+	}
+
+	executor.workerWG.Wait()
+}
+
+func TestExecutor_ShouldNotCreateNewWorkerWhenMaxWorkersHaveBeenCreated(t *testing.T) {
+	concurrency := uint64(4)
+	executor := New("test", Config{
+		Concurrency:         concurrency,
+		QueueSize:           4,
+		EagerInitialization: false,
+	}).(*executor)
+
+	for i := uint64(0); i < concurrency+10; i++ {
+		assert.Equal(t, i < concurrency, executor.newWorker())
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerCount))
+		assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
 	}
 }
 
