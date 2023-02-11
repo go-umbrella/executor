@@ -26,7 +26,7 @@ func TestExecution_Wait(t *testing.T) {
 
 	execution.Wait()
 	assert.True(t, result.Load())
-	assert.InDelta(t, delay, time.Now().Sub(start), float64(10*time.Millisecond))
+	assert.InDelta(t, delay, time.Since(start), float64(10*time.Millisecond))
 }
 
 func TestExecution_Get(t *testing.T) {
@@ -120,7 +120,7 @@ func TestExecution_Done(t *testing.T) {
 	case <-execution.Done():
 		// done successfully
 		assert.True(t, result.Load())
-		assert.InDelta(t, delay, time.Now().Sub(start), float64(10*time.Millisecond))
+		assert.InDelta(t, delay, time.Since(start), float64(10*time.Millisecond))
 	case <-time.After(delay + 25*time.Millisecond):
 		assert.FailNow(t, "task too slow")
 	}
