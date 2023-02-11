@@ -111,7 +111,7 @@ func TestExecutor_WorkerLifeCycle(t *testing.T) {
 	}
 
 	time.Sleep(200 * time.Millisecond)
-	assert.Equal(t, uint64(rounds), taskCounter)
+	assert.Equal(t, uint64(rounds), atomic.LoadUint64(&taskCounter))
 	assert.Equal(t, concurrency, atomic.LoadUint64(&executor.workerCount))
 	assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
 
