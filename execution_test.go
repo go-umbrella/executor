@@ -13,10 +13,10 @@ import (
 
 func TestExecution_Wait(t *testing.T) {
 	delay := 100 * time.Millisecond
-	result := atomic.Bool{}
+	result := atomic.Int32{}
 	task := func(ctx context.Context, args []interface{}) (interface{}, error) {
 		time.Sleep(delay)
-		result.Store(true)
+		result.Store(1)
 		return nil, nil
 	}
 
@@ -25,7 +25,7 @@ func TestExecution_Wait(t *testing.T) {
 	go execution.start()
 
 	execution.Wait()
-	assert.True(t, result.Load())
+	assert.True(t, result.Load() == 1)
 	assert.InDelta(t, delay, time.Since(start), float64(10*time.Millisecond))
 }
 
@@ -105,10 +105,10 @@ func TestExecution_Get(t *testing.T) {
 
 func TestExecution_Done(t *testing.T) {
 	delay := 100 * time.Millisecond
-	result := atomic.Bool{}
+	result := atomic.Int32{}
 	task := func(ctx context.Context, args []interface{}) (interface{}, error) {
 		time.Sleep(delay)
-		result.Store(true)
+		result.Store(1)
 		return nil, nil
 	}
 
@@ -119,7 +119,7 @@ func TestExecution_Done(t *testing.T) {
 	select {
 	case <-execution.Done():
 		// done successfully
-		assert.True(t, result.Load())
+		assert.True(t, result.Load() == 1)
 		assert.InDelta(t, delay, time.Since(start), float64(10*time.Millisecond))
 	case <-time.After(delay + 25*time.Millisecond):
 		assert.FailNow(t, "task too slow")
