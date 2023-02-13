@@ -1,7 +1,10 @@
 package executor
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"github.com/go-umbrella/executor/options/tasks"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -9,12 +12,14 @@ import (
 
 type (
 	Executor interface {
+		Go(ctx context.Context, task Task, opts ...tasks.Option) Execution
 		Name() string
 	}
 
 	executor struct {
 		name               string
 		config             Config
+		dispatcherQueue    chan *execution
 		taskQueue          chan func()
 		workerWG           sync.WaitGroup
 		workerStopSignal   chan struct{}
@@ -28,9 +33,16 @@ func New(name string, config Config) Executor {
 	return (&executor{
 		name:             name,
 		config:           config,
+		dispatcherQueue:  make(chan *execution, runtime.NumCPU()),
 		taskQueue:        make(chan func(), config.QueueSize),
 		workerStopSignal: make(chan struct{}, runtime.NumCPU()),
 	}).initialize()
+}
+
+func (e *executor) Go(ctx context.Context, task Task, opts ...tasks.Option) Execution {
+	execution := newExecution(ctx, task, opts...)
+	e.dispatcherQueue <- execution
+	return execution
 }
 
 func (e *executor) Name() string {
@@ -40,6 +52,7 @@ func (e *executor) Name() string {
 func (e *executor) initialize() *executor {
 	e.normalizeName()
 	e.initializeWorkers()
+	go e.dispatcher()
 	return e
 }
 
@@ -59,11 +72,29 @@ func (e *executor) initializeWorkers() {
 	}
 }
 
-func (e *executor) newWorker() bool {
-	if atomic.LoadUint64(&e.workerCount) >= e.config.Concurrency {
-		return false
-	}
+func (e *executor) dispatcher() {
+	for {
+		execution := <-e.dispatcherQueue
+		taskEnqueued := e.tryEnqueueTask(execution)
 
+		// always try to create a new worker up to maximum concurrency if there are no idle workers
+		if !e.hasIdleWorker() && e.canCreateNewWorker() {
+			e.newWorker()
+
+			if !taskEnqueued {
+				e.enqueueTask(execution)
+				taskEnqueued = true
+			}
+		}
+
+		if !taskEnqueued {
+			execution.setResult(nil, errors.New("rejected_execution"))
+			execution.stop()
+		}
+	}
+}
+
+func (e *executor) newWorker() {
 	e.workerWG.Add(1)
 	atomic.AddUint64(&e.workerCount, 1)
 
@@ -84,6 +115,26 @@ func (e *executor) newWorker() bool {
 			}
 		}
 	}()
+}
 
-	return true
+func (e *executor) enqueueTask(execution *execution) {
+	e.taskQueue <- execution.start
+}
+
+func (e *executor) tryEnqueueTask(execution *execution) bool {
+	select {
+	case e.taskQueue <- execution.start:
+		return true
+	default:
+		// queue is full
+		return false
+	}
+}
+
+func (e *executor) canCreateNewWorker() bool {
+	return atomic.LoadUint64(&e.workerCount) < e.config.Concurrency
+}
+
+func (e *executor) hasIdleWorker() bool {
+	return atomic.LoadUint64(&e.workerRunningCount) < atomic.LoadUint64(&e.workerCount)
 }

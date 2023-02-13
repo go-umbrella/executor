@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"math"
@@ -133,10 +135,54 @@ func TestExecutor_ShouldNotCreateNewWorkerWhenMaxWorkersHaveBeenCreated(t *testi
 		EagerInitialization: false,
 	}).(*executor)
 
-	for i := uint64(0); i < concurrency+10; i++ {
-		assert.Equal(t, i < concurrency, executor.newWorker())
+	executions := make([]Execution, 0)
+	for i := uint64(0); i < concurrency+4; i++ {
+		executions = append(executions, executor.Go(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			time.Sleep(100 * time.Millisecond)
+			return true, nil
+		}))
+
+		time.Sleep(15 * time.Millisecond)
 		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerCount))
-		assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerRunningCount))
+	}
+
+	for _, execution := range executions {
+		result, err := execution.Wait().Get()
+		assert.Equal(t, true, result)
+		assert.Nil(t, err)
+	}
+}
+
+func TestExecutor_ShouldCreateWorkerWhenQueueIsFullAndHandleNoIdleWorkerAndQueueIsFull(t *testing.T) {
+	concurrency := uint64(1)
+	executor := New("test", Config{
+		Concurrency:         concurrency,
+		QueueSize:           0,
+		EagerInitialization: false,
+	}).(*executor)
+
+	executions := make([]Execution, 0)
+	for i := uint64(0); i < concurrency+4; i++ {
+		executions = append(executions, executor.Go(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			time.Sleep(100 * time.Millisecond)
+			return true, nil
+		}))
+
+		time.Sleep(15 * time.Millisecond)
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerCount))
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerRunningCount))
+	}
+
+	for i, execution := range executions {
+		result, err := execution.Wait().Get()
+		if i == 0 {
+			assert.Equal(t, true, result)
+			assert.Nil(t, err)
+		} else {
+			assert.Nil(t, result)
+			assert.Equal(t, errors.New("rejected_execution"), err)
+		}
 	}
 }
 
