@@ -14,7 +14,7 @@ import (
 func TestExecution_Wait(t *testing.T) {
 	delay := 100 * time.Millisecond
 	result := atomic.Bool{}
-	task := func(ctx context.Context, args []interface{}) (interface{}, error) {
+	task := func(ctx TaskContext) (interface{}, error) {
 		time.Sleep(delay)
 		result.Store(true)
 		return nil, nil
@@ -37,13 +37,13 @@ func TestExecution_WaitCtx(t *testing.T) {
 	}{
 		{
 			name: "should_wait",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				return true, nil
 			}),
 		},
 		{
 			name: "should_not_wait",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				time.Sleep(100 * time.Millisecond)
 				return true, nil
 			}),
@@ -55,11 +55,11 @@ func TestExecution_WaitCtx(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			go testCase.execution.start()
 			if testCase.err == nil {
-				assert.Nil(t, testCase.execution.WaitCtx(context.Background()))
+				assert.True(t, testCase.execution.WaitCtx(context.Background()))
 			} else {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
-				assert.Equal(t, testCase.err, testCase.execution.WaitCtx(ctx))
+				assert.False(t, testCase.execution.WaitCtx(ctx))
 			}
 
 			result, err := testCase.execution.Wait().Get()
@@ -77,13 +77,13 @@ func TestExecution_WaitTimeoutAndDeadline(t *testing.T) {
 	}{
 		{
 			name: "should_wait",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				return true, nil
 			}),
 		},
 		{
 			name: "should_not_wait",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				time.Sleep(100 * time.Millisecond)
 				return true, nil
 			}),
@@ -97,11 +97,11 @@ func TestExecution_WaitTimeoutAndDeadline(t *testing.T) {
 			timeout := 25 * time.Millisecond
 
 			if testCase.err == nil {
-				assert.Nil(t, testCase.execution.WaitTimeout(timeout))
-				assert.Nil(t, testCase.execution.WaitDeadline(time.Now().Add(timeout)))
+				assert.True(t, testCase.execution.WaitTimeout(timeout))
+				assert.True(t, testCase.execution.WaitDeadline(time.Now().Add(timeout)))
 			} else {
-				assert.Equal(t, testCase.err, testCase.execution.WaitTimeout(timeout))
-				assert.Equal(t, testCase.err, testCase.execution.WaitDeadline(time.Now().Add(timeout)))
+				assert.False(t, testCase.execution.WaitTimeout(timeout))
+				assert.False(t, testCase.execution.WaitDeadline(time.Now().Add(timeout)))
 			}
 
 			result, err := testCase.execution.Wait().Get()
@@ -121,7 +121,7 @@ func TestExecution_Get(t *testing.T) {
 	}{
 		{
 			name: "should_return_result_and_error_null",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				return nil, nil
 			}),
 			result: nil,
@@ -129,7 +129,7 @@ func TestExecution_Get(t *testing.T) {
 		},
 		{
 			name: "should_return_error",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				return nil, stderrors.New("my_error")
 			}),
 			result: nil,
@@ -137,7 +137,7 @@ func TestExecution_Get(t *testing.T) {
 		},
 		{
 			name: "should_return_result",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				return "my_result", nil
 			}),
 			result: "my_result",
@@ -145,7 +145,7 @@ func TestExecution_Get(t *testing.T) {
 		},
 		{
 			name: "should_return_both",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				return "my_result", stderrors.New("my_error")
 			}),
 			result: "my_result",
@@ -153,15 +153,15 @@ func TestExecution_Get(t *testing.T) {
 		},
 		{
 			name: "should_execute_with_args",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
-				return args[0], args[1].(error)
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
+				return ctx.Args()[0], ctx.Args()[1].(error)
 			}, tasks.Args("my_result", stderrors.New("my_error"))),
 			result: "my_result",
 			err:    stderrors.New("my_error"),
 		},
 		{
 			name: "should_recover_from_panic",
-			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+			execution: newExecution(context.Background(), func(ctx TaskContext) (interface{}, error) {
 				panic("panic_message")
 			}),
 			result: nil,
@@ -188,7 +188,7 @@ func TestExecution_Get(t *testing.T) {
 func TestExecution_Done(t *testing.T) {
 	delay := 100 * time.Millisecond
 	result := atomic.Bool{}
-	task := func(ctx context.Context, args []interface{}) (interface{}, error) {
+	task := func(ctx TaskContext) (interface{}, error) {
 		time.Sleep(delay)
 		result.Store(true)
 		return nil, nil

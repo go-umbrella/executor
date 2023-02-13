@@ -22,9 +22,8 @@ type (
 	}
 
 	execution struct {
-		ctx     context.Context
-		cancel  context.CancelCauseFunc
 		task    Task
+		taskCtx *taskContext
 		args    []interface{}
 		result  atomic.Value
 		error   atomic.Value
@@ -41,11 +40,13 @@ var (
 
 func newExecution(ctx context.Context, task Task, opts ...tasks.Option) *execution {
 	execution := new(execution)
-	execution.ctx, execution.cancel = context.WithCancelCause(ctx)
 	execution.task = task
 	execution.status.Store(ExecutionWaitingStatus)
 	execution.done = make(chan struct{})
 	execution.processOptions(opts...)
+
+	cancelCtx, cancel := context.WithCancelCause(ctx)
+	execution.taskCtx = newTaskContext(cancelCtx, cancel, execution.args)
 	return execution
 }
 
@@ -86,6 +87,7 @@ func (e *execution) Cancel() bool {
 
 	e.status.Store(ExecutionCancelledStatus)
 	e.error.Store(executionCancelledError)
+	e.taskCtx.cancel(executionCancelledError)
 	close(e.done)
 	return true
 }
@@ -116,7 +118,7 @@ func (e *execution) start() {
 		e.setResult(result, err)
 	}()
 
-	result, err = e.task(e.ctx, e.args)
+	result, err = e.task(e.taskCtx)
 }
 
 func (e *execution) setResult(result interface{}, error error) bool {

@@ -137,7 +137,7 @@ func TestExecutor_ShouldNotCreateNewWorkerWhenMaxWorkersHaveBeenCreated(t *testi
 
 	executions := make([]Execution, 0)
 	for i := uint64(0); i < concurrency+4; i++ {
-		executions = append(executions, executor.Go(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+		executions = append(executions, executor.Go(context.Background(), func(ctx TaskContext) (interface{}, error) {
 			time.Sleep(100 * time.Millisecond)
 			return true, nil
 		}))
@@ -164,7 +164,7 @@ func TestExecutor_ShouldCreateWorkerWhenQueueIsFullAndHandleNoIdleWorkerAndQueue
 
 	executions := make([]Execution, 0)
 	for i := uint64(0); i < concurrency+4; i++ {
-		executions = append(executions, executor.Go(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+		executions = append(executions, executor.Go(context.Background(), func(ctx TaskContext) (interface{}, error) {
 			time.Sleep(100 * time.Millisecond)
 			return true, nil
 		}))
