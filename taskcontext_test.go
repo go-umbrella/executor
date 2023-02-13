@@ -9,7 +9,7 @@ import (
 
 func TestTaskContext_Args(t *testing.T) {
 	args := []interface{}{1, 2, 3}
-	ctx := newTaskContext(context.Background(), args)
+	ctx := newTaskContext(context.Background(), args, nil)
 	assert.Equal(t, args, ctx.Args())
 }
 
@@ -17,7 +17,7 @@ func TestTaskContext_Deadline(t *testing.T) {
 	deadlineCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(100*time.Millisecond))
 	defer cancel()
 
-	ctx := newTaskContext(deadlineCtx, nil)
+	ctx := newTaskContext(deadlineCtx, nil, nil)
 
 	deadline, ok := ctx.Deadline()
 	deadlineCtxDeadline, deadlineCtxOk := deadlineCtx.Deadline()
@@ -29,7 +29,7 @@ func TestTaskContext_DoneAndErr(t *testing.T) {
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ctx := newTaskContext(cancelCtx, nil)
+	ctx := newTaskContext(cancelCtx, nil, nil)
 
 	select {
 	case <-ctx.Done():
@@ -52,6 +52,6 @@ func TestTaskContext_DoneAndErr(t *testing.T) {
 }
 
 func TestTaskContext_Value(t *testing.T) {
-	ctx := newTaskContext(context.WithValue(context.Background(), "key", "value"), nil)
+	ctx := newTaskContext(context.WithValue(context.Background(), "key", "value"), nil, nil)
 	assert.Equal(t, "value", ctx.Value("key"))
 }

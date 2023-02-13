@@ -12,15 +12,17 @@ type (
 	}
 
 	taskContext struct {
-		ctx  context.Context
-		args []interface{}
+		ctx    context.Context
+		cancel context.CancelCauseFunc
+		args   []interface{}
 	}
 )
 
-func newTaskContext(ctx context.Context, args []interface{}) *taskContext {
+func newTaskContext(ctx context.Context, cancel context.CancelCauseFunc, args []interface{}) *taskContext {
 	return &taskContext{
-		ctx:  ctx,
-		args: args,
+		ctx:    ctx,
+		cancel: cancel,
+		args:   args,
 	}
 }
 
