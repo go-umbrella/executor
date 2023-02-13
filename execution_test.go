@@ -29,6 +29,88 @@ func TestExecution_Wait(t *testing.T) {
 	assert.InDelta(t, delay, time.Since(start), float64(10*time.Millisecond))
 }
 
+func TestExecution_WaitCtx(t *testing.T) {
+	testCases := []struct {
+		name      string
+		execution *execution
+		err       error
+	}{
+		{
+			name: "should_wait",
+			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+				return true, nil
+			}),
+		},
+		{
+			name: "should_not_wait",
+			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+				time.Sleep(100 * time.Millisecond)
+				return true, nil
+			}),
+			err: stderrors.New("context canceled"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			go testCase.execution.start()
+			if testCase.err == nil {
+				assert.Nil(t, testCase.execution.WaitCtx(context.Background()))
+			} else {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				assert.Equal(t, testCase.err, testCase.execution.WaitCtx(ctx))
+			}
+
+			result, err := testCase.execution.Wait().Get()
+			assert.Equal(t, true, result)
+			assert.Nil(t, err)
+		})
+	}
+}
+
+func TestExecution_WaitTimeoutAndDeadline(t *testing.T) {
+	testCases := []struct {
+		name      string
+		execution *execution
+		err       error
+	}{
+		{
+			name: "should_wait",
+			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+				return true, nil
+			}),
+		},
+		{
+			name: "should_not_wait",
+			execution: newExecution(context.Background(), func(ctx context.Context, args []interface{}) (interface{}, error) {
+				time.Sleep(100 * time.Millisecond)
+				return true, nil
+			}),
+			err: stderrors.New("execution_timeout"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			go testCase.execution.start()
+			timeout := 25 * time.Millisecond
+
+			if testCase.err == nil {
+				assert.Nil(t, testCase.execution.WaitTimeout(timeout))
+				assert.Nil(t, testCase.execution.WaitDeadline(time.Now().Add(timeout)))
+			} else {
+				assert.Equal(t, testCase.err, testCase.execution.WaitTimeout(timeout))
+				assert.Equal(t, testCase.err, testCase.execution.WaitDeadline(time.Now().Add(timeout)))
+			}
+
+			result, err := testCase.execution.Wait().Get()
+			assert.Equal(t, true, result)
+			assert.Nil(t, err)
+		})
+	}
+}
+
 func TestExecution_Get(t *testing.T) {
 	testCases := []struct {
 		name      string
