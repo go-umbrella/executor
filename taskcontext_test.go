@@ -52,6 +52,7 @@ func TestTaskContext_DoneAndErr(t *testing.T) {
 }
 
 func TestTaskContext_Value(t *testing.T) {
-	ctx := newTaskContext(context.WithValue(context.Background(), "key", "value"), nil, nil)
-	assert.Equal(t, "value", ctx.Value("key"))
+	type myKey string
+	ctx := newTaskContext(context.WithValue(context.Background(), myKey("key"), "value"), nil, nil)
+	assert.Equal(t, "value", ctx.Value(myKey("key")))
 }
