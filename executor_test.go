@@ -181,7 +181,7 @@ func TestExecutor_ShouldCreateWorkerWhenQueueIsFullAndHandleNoIdleWorkerAndQueue
 			assert.Nil(t, err)
 		} else {
 			assert.Nil(t, result)
-			assert.Equal(t, errors.New("rejected_execution"), err)
+			assert.Equal(t, errors.New("execution_rejected"), err)
 		}
 	}
 }

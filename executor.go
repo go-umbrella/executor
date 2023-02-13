@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/go-umbrella/executor/options/tasks"
 	"runtime"
@@ -88,8 +87,7 @@ func (e *executor) dispatcher() {
 		}
 
 		if !taskEnqueued {
-			execution.setResult(nil, errors.New("rejected_execution"))
-			execution.stop()
+			execution.reject()
 		}
 	}
 }

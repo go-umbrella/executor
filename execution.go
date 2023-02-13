@@ -12,29 +12,38 @@ import (
 type (
 	Execution interface {
 		Wait() Execution
-		WaitCtx(ctx context.Context) error
-		WaitDeadline(deadline time.Time) error
-		WaitTimeout(duration time.Duration) error
+		WaitCtx(ctx context.Context) bool
+		WaitDeadline(deadline time.Time) bool
+		WaitTimeout(duration time.Duration) bool
+		Cancel() bool
 		Get() (interface{}, error)
+		Status() ExecutionStatus
 		Done() <-chan struct{}
 	}
 
 	execution struct {
-		ctx    context.Context
-		task   Task
-		args   []interface{}
-		result atomic.Value
-		error  atomic.Value
-		done   chan struct{}
+		ctx     context.Context
+		cancel  context.CancelCauseFunc
+		task    Task
+		args    []interface{}
+		result  atomic.Value
+		error   atomic.Value
+		status  atomic.Value
+		stopped int32
+		done    chan struct{}
 	}
 )
 
-var executionTimeoutError = stderrors.New("execution_timeout")
+var (
+	executionCancelledError = stderrors.New("execution_cancelled")
+	executionRejectedError  = stderrors.New("execution_rejected")
+)
 
 func newExecution(ctx context.Context, task Task, opts ...tasks.Option) *execution {
 	execution := new(execution)
-	execution.ctx = ctx
+	execution.ctx, execution.cancel = context.WithCancelCause(ctx)
 	execution.task = task
+	execution.status.Store(ExecutionWaitingStatus)
 	execution.done = make(chan struct{})
 	execution.processOptions(opts...)
 	return execution
@@ -45,37 +54,48 @@ func (e *execution) Wait() Execution {
 	return e
 }
 
-func (e *execution) WaitCtx(ctx context.Context) error {
+func (e *execution) WaitCtx(ctx context.Context) bool {
 	select {
 	case <-e.done:
-		return nil
+		return true
 	case <-ctx.Done():
-		return ctx.Err()
+		return false
 	}
 }
 
-func (e *execution) WaitDeadline(deadline time.Time) error {
+func (e *execution) WaitDeadline(deadline time.Time) bool {
 	return e.WaitTimeout(time.Until(deadline))
 }
 
-func (e *execution) WaitTimeout(duration time.Duration) error {
+func (e *execution) WaitTimeout(duration time.Duration) bool {
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
 
 	select {
 	case <-e.done:
-		return nil
+		return true
 	case <-timer.C:
-		return executionTimeoutError
+		return false
 	}
 }
 
-func (e *execution) Get() (interface{}, error) {
-	if err := e.error.Load(); err != nil {
-		return e.result.Load(), err.(error)
+func (e *execution) Cancel() bool {
+	if !atomic.CompareAndSwapInt32(&e.stopped, 0, 1) {
+		return false
 	}
 
-	return e.result.Load(), nil
+	e.status.Store(ExecutionCancelledStatus)
+	e.error.Store(executionCancelledError)
+	close(e.done)
+	return true
+}
+
+func (e *execution) Get() (interface{}, error) {
+	return e.result.Load(), e.loadError()
+}
+
+func (e *execution) Status() ExecutionStatus {
+	return e.status.Load().(ExecutionStatus)
 }
 
 func (e *execution) Done() <-chan struct{} {
@@ -83,18 +103,27 @@ func (e *execution) Done() <-chan struct{} {
 }
 
 func (e *execution) start() {
+	var (
+		result interface{}
+		err    error
+	)
+
 	defer func() {
 		if value := recover(); value != nil {
-			e.setResult(nil, errors.NewRecoveredPanicError(1, value))
+			result, err = nil, errors.NewRecoveredPanicError(1, value)
 		}
 
-		e.stop()
+		e.setResult(result, err)
 	}()
 
-	e.setResult(e.task(e.ctx, e.args))
+	result, err = e.task(e.ctx, e.args)
 }
 
-func (e *execution) setResult(result interface{}, error error) {
+func (e *execution) setResult(result interface{}, error error) bool {
+	if !atomic.CompareAndSwapInt32(&e.stopped, 0, 1) {
+		return false
+	}
+
 	if result != nil {
 		e.result.Store(result)
 	}
@@ -102,9 +131,18 @@ func (e *execution) setResult(result interface{}, error error) {
 	if error != nil {
 		e.error.Store(error)
 	}
+
+	close(e.done)
+	return true
 }
 
-func (e *execution) stop() {
+func (e *execution) reject() {
+	if !atomic.CompareAndSwapInt32(&e.stopped, 0, 1) {
+		return
+	}
+
+	e.status.Store(ExecutionWaitingStatus)
+	e.error.Store(executionRejectedError)
 	close(e.done)
 }
 
@@ -117,4 +155,13 @@ func (e *execution) processOptions(opts ...tasks.Option) {
 			}
 		}
 	}
+}
+
+func (e *execution) loadError() error {
+	err := e.error.Load()
+	if err != nil {
+		return err.(error)
+	}
+
+	return nil
 }
