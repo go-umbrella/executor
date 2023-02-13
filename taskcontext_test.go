@@ -9,7 +9,7 @@ import (
 
 func TestTaskContext_Args(t *testing.T) {
 	args := []interface{}{1, 2, 3}
-	ctx := newTaskContext(context.Background(), args, nil)
+	ctx := newTaskContext(context.Background(), nil, args)
 	assert.Equal(t, args, ctx.Args())
 }
 
