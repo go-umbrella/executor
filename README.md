@@ -35,11 +35,11 @@ go get -u github.com/go-umbrella/executor
 ```
 
 ## 📚 TL;DR
-- [`Executor`](https://pkg.go.dev/github.com/go-umbrella/executor#Executor) is a specialized workerpool to run async tasks, then:
-  - Use [`executor.Computation()`](https://pkg.go.dev/github.com/go-umbrella/executor#Computation) if you want to run **computation** intensive tasks (math operations, etc).
-  - Use [`executor.IO()`](https://pkg.go.dev/github.com/go-umbrella/executor#IO) if you want to run **IO** intensive tasks  (http calls, database connections, etc).
-  - Use [`executor.Single()`](https://pkg.go.dev/github.com/go-umbrella/executor#Single) if you want to run only **single** async task at a time.
-  - Use [`executor.New(name, config)`](https://pkg.go.dev/github.com/go-umbrella/executor#New) if you want to create a **new custom executor**.
+[`Executor`](https://pkg.go.dev/github.com/go-umbrella/executor#Executor) is a specialized workerpool to run async tasks, then:
+- Use [`executor.Computation()`](https://pkg.go.dev/github.com/go-umbrella/executor#Computation) if you want to run **computation** intensive tasks (math operations, etc).
+- Use [`executor.IO()`](https://pkg.go.dev/github.com/go-umbrella/executor#IO) if you want to run **IO** intensive tasks  (http calls, database connections, etc).
+- Use [`executor.Single()`](https://pkg.go.dev/github.com/go-umbrella/executor#Single) if you want to run only **single** async task at a time.
+- Use [`executor.New(name, config)`](https://pkg.go.dev/github.com/go-umbrella/executor#New) if you want to create a **new custom executor**.
 
 After `executor` was configured, then:
 - [`execution := e.Go(ctx, task, opts)`](https://pkg.go.dev/github.com/go-umbrella/executor#Executor.Go) to submit a task to run async.
