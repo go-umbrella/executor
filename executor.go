@@ -80,13 +80,20 @@ func (e *executor) dispatcher() {
 		if !e.hasIdleWorker() && e.canCreateNewWorker() {
 			e.newWorker()
 
+			// new worker created, so if the queue is full, wait until the new goroutine read the first task.
 			if !taskEnqueued {
 				e.enqueueTask(execution)
-				taskEnqueued = true
+				continue
 			}
 		}
 
-		if !taskEnqueued {
+		if taskEnqueued {
+			continue
+		}
+
+		if e.config.BlockOnFullQueue {
+			e.enqueueTask(execution)
+		} else {
 			execution.reject()
 		}
 	}

@@ -27,11 +27,13 @@ func TestConfig_Normalize(t *testing.T) {
 				Concurrency:         uint64(runtime.NumCPU() * 4),
 				QueueSize:           16,
 				EagerInitialization: true,
+				BlockOnFullQueue:    true,
 			},
 			expected: Config{
 				Concurrency:         uint64(runtime.NumCPU() * 4),
 				QueueSize:           16,
 				EagerInitialization: true,
+				BlockOnFullQueue:    true,
 			},
 		},
 	}

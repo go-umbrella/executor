@@ -186,6 +186,32 @@ func TestExecutor_ShouldCreateWorkerWhenQueueIsFullAndHandleNoIdleWorkerAndQueue
 	}
 }
 
+func TestExecutor_ShouldBlockOnFullQueue(t *testing.T) {
+	executor := New("test", Config{
+		Concurrency:         1,
+		QueueSize:           0,
+		EagerInitialization: true,
+		BlockOnFullQueue:    true,
+	}).(*executor)
+
+	executions := make([]Execution, 0)
+	executions = append(executions, executor.Go(context.Background(), func(ctx TaskContext) (interface{}, error) {
+		time.Sleep(250 * time.Millisecond)
+		return 1, nil
+	}))
+
+	executions = append(executions, executor.Go(context.Background(), func(ctx TaskContext) (interface{}, error) {
+		time.Sleep(250 * time.Millisecond)
+		return 2, nil
+	}))
+
+	for i, e := range executions {
+		result, err := e.Wait().Get()
+		assert.Equal(t, i+1, result)
+		assert.NoError(t, err)
+	}
+}
+
 func TestExecutor_Name(t *testing.T) {
 	testCases := []struct {
 		name         string
