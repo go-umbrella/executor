@@ -19,3 +19,7 @@ func (s Status) Terminating() bool {
 func (s Status) Terminated() bool {
 	return s == TerminatedStatus
 }
+
+func (s Status) String() string {
+	return string(s)
+}
