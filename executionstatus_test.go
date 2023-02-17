@@ -58,6 +58,8 @@ func TestExecutionStatus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			assert.Equal(t, testCase.name, testCase.executionStatus.String())
+
 			for _, status := range statusList {
 				assert.Equal(t, status == testCase.executionStatus, testCase.expected(status))
 			}

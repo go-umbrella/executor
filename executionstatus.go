@@ -29,3 +29,7 @@ func (s ExecutionStatus) Cancelled() bool {
 func (s ExecutionStatus) Done() bool {
 	return s == ExecutionDoneStatus
 }
+
+func (s ExecutionStatus) String() string {
+	return string(s)
+}
