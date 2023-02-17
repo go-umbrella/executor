@@ -87,6 +87,44 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestExecutor_Shutdown(t *testing.T) {
+	executor := New("test", Config{
+		Concurrency:         1,
+		QueueSize:           0,
+		EagerInitialization: true,
+		BlockOnFullQueue:    true,
+	})
+
+	var counter atomic.Uint64
+	var counterTask Task = func(ctx TaskContext) (interface{}, error) {
+		time.Sleep(100 * time.Millisecond)
+		return counter.Add(1), nil
+	}
+
+	executor.Go(context.Background(), counterTask)
+	executor.Go(context.Background(), counterTask)
+
+	executor.Shutdown()
+	assert.Equal(t, TerminatingStatus, executor.Status())
+
+	select {
+	case <-time.After(220 * time.Millisecond):
+		assert.FailNow(t, "To slow")
+	case <-executor.Done():
+		assert.Equal(t, uint64(2), counter.Load())
+		assert.Equal(t, TerminatedStatus, executor.Status())
+	}
+
+	// should not change status
+	executor.Shutdown()
+	assert.Equal(t, TerminatedStatus, executor.Status())
+
+	// should reject
+	execution := executor.Go(context.Background(), counterTask)
+	assert.Equal(t, ExecutionRejectedStatus, execution.Status())
+	assert.Equal(t, uint64(2), counter.Load())
+}
+
 func TestExecutor_Status(t *testing.T) {
 	executor := New("test", Config{})
 	assert.Equal(t, RunningStatus, executor.Status())
