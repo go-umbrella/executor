@@ -12,6 +12,7 @@ import (
 type (
 	Executor interface {
 		Go(ctx context.Context, task Task, opts ...tasks.Option) Execution
+		Status() Status
 		Name() string
 	}
 
@@ -24,6 +25,7 @@ type (
 		workerStopSignal   chan struct{}
 		workerCount        uint64
 		workerRunningCount uint64
+		status             atomic.Value
 	}
 )
 
@@ -44,11 +46,16 @@ func (e *executor) Go(ctx context.Context, task Task, opts ...tasks.Option) Exec
 	return execution
 }
 
+func (e *executor) Status() Status {
+	return e.status.Load().(Status)
+}
+
 func (e *executor) Name() string {
 	return e.name
 }
 
 func (e *executor) initialize() *executor {
+	e.status.Store(RunningStatus)
 	e.normalizeName()
 	e.initializeWorkers()
 	go e.dispatcher()

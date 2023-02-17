@@ -87,6 +87,11 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestExecutor_Status(t *testing.T) {
+	executor := New("test", Config{})
+	assert.Equal(t, RunningStatus, executor.Status())
+}
+
 func TestExecutor_WorkerLifeCycle(t *testing.T) {
 	concurrency := uint64(4)
 	executor := New("test", Config{
