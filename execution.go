@@ -143,7 +143,7 @@ func (e *execution) reject() {
 		return
 	}
 
-	e.status.Store(ExecutionWaitingStatus)
+	e.status.Store(ExecutionRejectedStatus)
 	e.error.Store(executionRejectedError)
 	close(e.done)
 }
