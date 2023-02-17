@@ -81,8 +81,8 @@ func TestNew(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			executor := testCase.executor.(*executor)
 			assert.Equal(t, testCase.expected.config, executor.config)
-			assert.Equal(t, testCase.expected.workerCount, atomic.LoadUint64(&executor.workerCount))
-			assert.Equal(t, testCase.expected.workerRunningCount, atomic.LoadUint64(&executor.workerRunningCount))
+			assert.Equal(t, testCase.expected.workerCount, executor.workerCount.Load())
+			assert.Equal(t, testCase.expected.workerRunningCount, executor.workerRunningCount.Load())
 		})
 	}
 }
@@ -100,8 +100,8 @@ func TestExecutor_WorkerLifeCycle(t *testing.T) {
 		EagerInitialization: true,
 	}).(*executor)
 
-	assert.Equal(t, concurrency, atomic.LoadUint64(&executor.workerCount))
-	assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
+	assert.Equal(t, concurrency, executor.workerCount.Load())
+	assert.Equal(t, uint64(0), executor.workerRunningCount.Load())
 
 	taskCounter := uint64(0)
 	rounds := 8
@@ -113,20 +113,20 @@ func TestExecutor_WorkerLifeCycle(t *testing.T) {
 	for i := 0; i < rounds; i++ {
 		executor.taskQueue <- task
 		time.Sleep(10 * time.Millisecond)
-		assert.Equal(t, concurrency, atomic.LoadUint64(&executor.workerCount))
-		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerRunningCount))
+		assert.Equal(t, concurrency, executor.workerCount.Load())
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), executor.workerRunningCount.Load())
 	}
 
 	time.Sleep(200 * time.Millisecond)
 	assert.Equal(t, uint64(rounds), atomic.LoadUint64(&taskCounter))
-	assert.Equal(t, concurrency, atomic.LoadUint64(&executor.workerCount))
-	assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
+	assert.Equal(t, concurrency, executor.workerCount.Load())
+	assert.Equal(t, uint64(0), executor.workerRunningCount.Load())
 
 	for i := uint64(0); i < concurrency; i++ {
 		executor.workerStopSignal <- struct{}{}
 		time.Sleep(10 * time.Millisecond)
-		assert.Equal(t, concurrency-(i+1), atomic.LoadUint64(&executor.workerCount))
-		assert.Equal(t, uint64(0), atomic.LoadUint64(&executor.workerRunningCount))
+		assert.Equal(t, concurrency-(i+1), executor.workerCount.Load())
+		assert.Equal(t, uint64(0), executor.workerRunningCount.Load())
 	}
 
 	executor.workerWG.Wait()
@@ -148,8 +148,8 @@ func TestExecutor_ShouldNotCreateNewWorkerWhenMaxWorkersHaveBeenCreated(t *testi
 		}))
 
 		time.Sleep(15 * time.Millisecond)
-		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerCount))
-		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerRunningCount))
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), executor.workerCount.Load())
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), executor.workerRunningCount.Load())
 	}
 
 	for _, execution := range executions {
@@ -175,8 +175,8 @@ func TestExecutor_ShouldCreateWorkerWhenQueueIsFullAndHandleNoIdleWorkerAndQueue
 		}))
 
 		time.Sleep(15 * time.Millisecond)
-		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerCount))
-		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), atomic.LoadUint64(&executor.workerRunningCount))
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), executor.workerCount.Load())
+		assert.Equal(t, uint64(math.Min(float64(i+1), float64(concurrency))), executor.workerRunningCount.Load())
 	}
 
 	for i, execution := range executions {

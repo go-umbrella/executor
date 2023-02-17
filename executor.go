@@ -23,8 +23,8 @@ type (
 		taskQueue          chan func()
 		workerWG           sync.WaitGroup
 		workerStopSignal   chan struct{}
-		workerCount        uint64
-		workerRunningCount uint64
+		workerCount        atomic.Uint64
+		workerRunningCount atomic.Uint64
 		status             atomic.Value
 	}
 )
@@ -108,20 +108,20 @@ func (e *executor) dispatcher() {
 
 func (e *executor) newWorker() {
 	e.workerWG.Add(1)
-	atomic.AddUint64(&e.workerCount, 1)
+	e.workerCount.Add(1)
 
 	go func() {
 		defer func() {
-			atomic.AddUint64(&e.workerCount, ^uint64(0))
+			e.workerCount.Add(^uint64(0))
 			e.workerWG.Done()
 		}()
 
 		for {
 			select {
 			case task := <-e.taskQueue:
-				atomic.AddUint64(&e.workerRunningCount, 1)
+				e.workerRunningCount.Add(1)
 				task()
-				atomic.AddUint64(&e.workerRunningCount, ^uint64(0))
+				e.workerRunningCount.Add(^uint64(0))
 			case <-e.workerStopSignal:
 				return
 			}
@@ -144,9 +144,9 @@ func (e *executor) tryEnqueueTask(execution *execution) bool {
 }
 
 func (e *executor) canCreateNewWorker() bool {
-	return atomic.LoadUint64(&e.workerCount) < e.config.Concurrency
+	return e.workerCount.Load() < e.config.Concurrency
 }
 
 func (e *executor) hasIdleWorker() bool {
-	return atomic.LoadUint64(&e.workerRunningCount) < atomic.LoadUint64(&e.workerCount)
+	return e.workerRunningCount.Load() < e.workerCount.Load()
 }
